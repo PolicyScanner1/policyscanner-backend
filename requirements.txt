@@ -1,5 +1,5 @@
 Flask
-pytesseract
-pdf2image
+flask-cors
+PyPDF2
 openai
 gunicorn
