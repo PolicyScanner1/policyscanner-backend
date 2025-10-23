@@ -4,10 +4,12 @@ import PyPDF2
 import io
 import os
 from openai import OpenAI
+import json
 
 app = Flask(__name__)
 CORS(app)
 
+# Load OpenAI key from Render environment
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 @app.route("/upload", methods=["POST"])
@@ -26,9 +28,9 @@ def upload():
         for page in pdf_reader.pages:
             text += page.extract_text() + "\n"
 
-        # === The AI extraction prompt ===
+        # === GPT parsing prompt ===
         prompt = f"""
-You are an expert insurance document parser.
+You are an expert insurance document parser. 
 The user will provide the text of a home insurance renewal schedule or policy document (after OCR).
 
 Your task is to extract ALL relevant details, including core policy fields and full risk/quote fields.
@@ -87,14 +89,13 @@ Rules:
 - If the document does not contain a field, return null for that field.
 - Extract numerical values as numbers where possible (e.g., 250000 not "£250,000").
 - Dates should be returned in ISO format (YYYY-MM-DD).
-- For Yes/No fields (e.g. accidental damage cover), return exactly "Yes" or "No".
+- For Yes/No fields, return exactly "Yes" or "No".
 - Only output valid JSON, nothing else.
 
 Document text:
 {text}
 """
 
-        # === Send to OpenAI ===
         completion = client.responses.create(
             model="gpt-4.1-mini",
             input=prompt,
@@ -103,19 +104,14 @@ Document text:
 
         result_text = completion.output[0].content[0].text.strip()
 
-        # Clean up triple backticks or markdown fences
+        # Clean markdown fences if present
         if result_text.startswith("```"):
             result_text = result_text.split("```json")[-1].split("```")[-1].strip()
 
-        data = {}
         try:
-            data = eval(result_text)
-        except Exception:
-            import json
-            try:
-                data = json.loads(result_text)
-            except:
-                data = {"raw_response": result_text}
+            data = json.loads(result_text)
+        except:
+            data = {"raw_response": result_text}
 
         return jsonify(data)
 
@@ -125,7 +121,7 @@ Document text:
 
 @app.route("/")
 def home():
-    return "PolicyScanner Backend is running!"
+    return "PolicyScanner Backend is running with GPT extraction!"
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
