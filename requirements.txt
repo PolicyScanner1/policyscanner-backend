@@ -3,4 +3,4 @@ flask-cors
 PyPDF2
 openai
 gunicorn
-pdfplumber
+pdfplumber==0.11.0
